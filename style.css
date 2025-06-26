@@ -1,0 +1,169 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #f5f5f5;
+    color: #333;
+    line-height: 1.6;
+}
+
+.container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+h1 {
+    text-align: center;
+    margin-bottom: 30px;
+    color: #2c3e50;
+    font-weight: 300;
+}
+
+.input-section {
+    display: flex;
+    gap: 15px;
+    margin-bottom: 30px;
+    align-items: center;
+}
+
+#numberInput {
+    flex: 1;
+    padding: 12px 16px;
+    border: 2px solid #ddd;
+    border-radius: 8px;
+    font-size: 16px;
+    transition: border-color 0.3s ease;
+}
+
+#numberInput:focus {
+    outline: none;
+    border-color: #3498db;
+}
+
+#randomBtn {
+    padding: 12px 20px;
+    background-color: #3498db;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 16px;
+    transition: background-color 0.3s ease;
+}
+
+#randomBtn:hover {
+    background-color: #2980b9;
+}
+
+.results-section {
+    background: white;
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.results-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+    gap: 15px;
+}
+
+.results-header h3 {
+    margin: 0;
+    color: #2c3e50;
+}
+
+.sort-buttons {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.sort-btn {
+    padding: 8px 12px;
+    border: 2px solid #3498db;
+    background-color: white;
+    color: #3498db;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+    transition: all 0.3s ease;
+    white-space: nowrap;
+}
+
+.sort-btn:hover {
+    background-color: #3498db;
+    color: white;
+}
+
+.sort-btn.active {
+    background-color: #3498db;
+    color: white;
+}
+
+.results-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 15px;
+    margin-top: 20px;
+}
+
+.result-item {
+    padding: 15px;
+    background-color: #f8f9fa;
+    border-radius: 12px;
+    border-left: 4px solid #3498db;
+    text-align: center;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.result-item:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+}
+
+.result-item:first-child {
+    border-left-color: #e74c3c;
+    background-color: #fff5f5;
+}
+
+.fraction {
+    font-size: 24px;
+    margin-bottom: 8px;
+    color: #2c3e50;
+}
+
+.decimal {
+    font-size: 14px;
+    color: #34495e;
+    margin-bottom: 8px;
+    font-family: 'Courier New', monospace;
+}
+
+.error {
+    font-size: 11px;
+    color: #7f8c8d;
+    margin-top: 5px;
+}
+
+.no-results {
+    text-align: center;
+    color: #7f8c8d;
+    font-style: italic;
+    padding: 40px;
+}
+
+.score {
+    font-size: 12px;
+    color: #27ae60;
+    margin-top: 4px;
+    font-weight: 600;
+}
