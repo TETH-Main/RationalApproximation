@@ -70,7 +70,6 @@ class RationalApproximator {
         // === 手法2: 総当たり探索による補完的な近似 ===
         // 連分数では見つからない可能性のある組み合わせをカバー
         for (let den = 1; den <= 100; den++) {
-            // 各分母に対して最も近い分子を計算
             const num = Math.round(x * den);
             
             // === 既約分数の判定プロセス ===
@@ -82,8 +81,6 @@ class RationalApproximator {
             // 例: 2/3 は GCD(2,3)=1 なので既約分数
             if (this.gcd(Math.abs(num), den) === 1) { // 既約分数のみ
                 const error = Math.abs(x - num / den);
-                
-                // 重複チェック: 既に同じ分数が見つかっている場合はスキップ
                 const exists = results.some(r => 
                     r.numerator === num && r.denominator === den
                 );
@@ -92,12 +89,13 @@ class RationalApproximator {
                 }
             }
         }
-        
+
         // 総合評価スコアを計算
         results.forEach(result => {
             result.comprehensiveScore = this.calculateComprehensiveScore(result.error, result.denominator);
+            result.lengthPrecisionScore = this.calculateLengthPrecisionScore(result.numerator, result.denominator, result.error);
         });
-        
+
         // ソート方法に応じてソート
         if (this.sortType === 'error') {
             results.sort((a, b) => a.error - b.error);
@@ -105,9 +103,47 @@ class RationalApproximator {
             results.sort((a, b) => a.denominator - b.denominator);
         } else if (this.sortType === 'comprehensive') {
             results.sort((a, b) => b.comprehensiveScore - a.comprehensiveScore); // 高いスコア順
+        } else if (this.sortType === 'lengthPrecision') {
+            results.sort((a, b) => b.lengthPrecisionScore - a.lengthPrecisionScore); // 高いスコア順
         }
-        
+
         return results.slice(0, 15); // 上位15個まで表示
+    }
+
+    /**
+     * 分母・分子の合計文字数と有効数字による精度を合わせたスコア
+     * - 精度スコア: 有効数字が多いほど高い（最大10点）
+     * - 分母・分子の合計文字数が少ないほど高い（最大10点、最小2点程度）
+     * - スコア = 精度スコア × (10 / (分母文字数+分子文字数))
+     */
+    calculateLengthPrecisionScore(numerator, denominator, error) {
+        // 精度スコア（有効数字ベース）
+        let precisionScore;
+        if (error === 0) {
+            precisionScore = 10;
+        } else {
+            const significantDigits = Math.floor(-Math.log10(error));
+            if (significantDigits <= 1) {
+                precisionScore = 1;
+            } else if (significantDigits === 2) {
+                precisionScore = 3;
+            } else if (significantDigits === 3) {
+                precisionScore = 5;
+            } else if (significantDigits === 4) {
+                precisionScore = 8;
+            } else if (significantDigits === 5) {
+                precisionScore = 9;
+            } else {
+                precisionScore = 10;
+            }
+        }
+        // 分母・分子の合計文字数
+        const numLen = Math.abs(numerator).toString().length;
+        const denLen = Math.abs(denominator).toString().length;
+        const totalLen = numLen + denLen;
+        // スコア計算（合計文字数が小さいほど高い）
+        const score = precisionScore / (1 + 2 * Math.exp(totalLen - 4)); // 5文字以下で高スコア、10文字以上で低スコア
+        return score;
     }
     
     calculateComprehensiveScore(error, denominator) {
@@ -214,36 +250,40 @@ class RationalApproximator {
             this.displayNoResults();
             return;
         }
-        
+
         let html = '<div class="results-header">';
         html += '<h3>近似分数候補</h3>';
         html += '<div class="sort-buttons">';
         html += `<button class="sort-btn ${this.sortType === 'error' ? 'active' : ''}" onclick="app.changeSortType('error')">誤差順</button>`;
         html += `<button class="sort-btn ${this.sortType === 'denominator' ? 'active' : ''}" onclick="app.changeSortType('denominator')">分母順</button>`;
         html += `<button class="sort-btn ${this.sortType === 'comprehensive' ? 'active' : ''}" onclick="app.changeSortType('comprehensive')">総合評価順</button>`;
+        html += `<button class="sort-btn ${this.sortType === 'lengthPrecision' ? 'active' : ''}" onclick="app.changeSortType('lengthPrecision')">桁数×精度順</button>`;
         html += '</div>';
         html += '</div>';
         html += '<div class="results-grid">';
-        
+
         approximations.forEach((approx, index) => {
-            const { numerator, denominator, error, comprehensiveScore } = approx;
+            const { numerator, denominator, error, comprehensiveScore, lengthPrecisionScore } = approx;
             const decimalValue = (numerator / denominator).toFixed(6);
-            
+
             html += '<div class="result-item">';
             html += '<div class="fraction" id="fraction-' + index + '"></div>';
             html += `<div class="decimal">≈ ${decimalValue}</div>`;
             html += `<div class="error">誤差: ${error.toExponential(3)}</div>`;
-            
+
             if (this.sortType === 'comprehensive') {
                 html += `<div class="score">総合評価: ${comprehensiveScore.toFixed(2)}</div>`;
             }
-            
+            if (this.sortType === 'lengthPrecision') {
+                html += `<div class="score">桁数×精度: ${lengthPrecisionScore.toFixed(2)}</div>`;
+            }
+
             html += '</div>';
         });
-        
+
         html += '</div>';
         this.resultsDiv.innerHTML = html;
-        
+
         // KaTeXで各分数を個別にレンダリング
         approximations.forEach((approx, index) => {
             const { numerator, denominator } = approx;
@@ -254,7 +294,7 @@ class RationalApproximator {
             }
         });
     }
-    
+
     changeSortType(newSortType) {
         this.sortType = newSortType;
         this.updateResults();
