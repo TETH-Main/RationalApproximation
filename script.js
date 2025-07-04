@@ -94,6 +94,8 @@ class RationalApproximator {
         results.forEach(result => {
             result.comprehensiveScore = this.calculateComprehensiveScore(result.error, result.denominator);
             result.lengthPrecisionScore = this.calculateLengthPrecisionScore(result.numerator, result.denominator, result.error);
+            result.precisionRank = this.getPrecisionRank(result.error);
+            result.totalLen = Math.abs(result.numerator).toString().length + Math.abs(result.denominator).toString().length;
         });
 
         // ソート方法に応じてソート
@@ -105,19 +107,34 @@ class RationalApproximator {
             results.sort((a, b) => b.comprehensiveScore - a.comprehensiveScore); // 高いスコア順
         } else if (this.sortType === 'lengthPrecision') {
             results.sort((a, b) => b.lengthPrecisionScore - a.lengthPrecisionScore); // 高いスコア順
+        } else if (this.sortType === 'precisionThenShorter') {
+            // 誤差（有効数字）降順、同じなら合計文字数昇順
+            results.sort((a, b) => {
+                if (b.precisionRank !== a.precisionRank) {
+                    return b.precisionRank - a.precisionRank;
+                }
+                return a.totalLen - b.totalLen;
+            });
         }
 
         return results.slice(0, 15); // 上位15個まで表示
     }
 
+    // 有効数字による誤差ランク（大きいほど誤差が高い）
+    getPrecisionRank(error) {
+        if (error === 0) return 10;
+        const significantDigits = Math.floor(-Math.log10(error));
+        return significantDigits;
+    }
+
     /**
-     * 分母・分子の合計文字数と有効数字による精度を合わせたスコア
-     * - 精度スコア: 有効数字が多いほど高い（最大10点）
+     * 分母・分子の合計文字数と有効数字による誤差を合わせたスコア
+     * - 誤差スコア: 有効数字が多いほど高い（最大10点）
      * - 分母・分子の合計文字数が少ないほど高い（最大10点、最小2点程度）
-     * - スコア = 精度スコア × (10 / (分母文字数+分子文字数))
+     * - スコア = 誤差スコア × (1 + 2 * exp(分母文字数+分子文字数))
      */
     calculateLengthPrecisionScore(numerator, denominator, error) {
-        // 精度スコア（有効数字ベース）
+        // 誤差スコア（有効数字ベース）
         let precisionScore;
         if (error === 0) {
             precisionScore = 10;
@@ -251,23 +268,29 @@ class RationalApproximator {
             return;
         }
 
-        let html = '<div class="results-header">';
+        // コピー通知用の要素を追加
+        let html = '<div id="copy-toast" style="display:none;position:fixed;top:30px;left:50%;transform:translateX(-50%);background:#27ae60;color:#fff;padding:12px 28px;border-radius:8px;font-size:16px;z-index:9999;box-shadow:0 2px 8px rgba(0,0,0,0.15);">コピーしました！</div>';
+
+        html += '<div class="results-header">';
         html += '<h3>近似分数候補</h3>';
         html += '<div class="sort-buttons">';
         html += `<button class="sort-btn ${this.sortType === 'error' ? 'active' : ''}" onclick="app.changeSortType('error')">誤差順</button>`;
         html += `<button class="sort-btn ${this.sortType === 'denominator' ? 'active' : ''}" onclick="app.changeSortType('denominator')">分母順</button>`;
         html += `<button class="sort-btn ${this.sortType === 'comprehensive' ? 'active' : ''}" onclick="app.changeSortType('comprehensive')">総合評価順</button>`;
-        html += `<button class="sort-btn ${this.sortType === 'lengthPrecision' ? 'active' : ''}" onclick="app.changeSortType('lengthPrecision')">桁数×精度順</button>`;
+        html += `<button class="sort-btn ${this.sortType === 'lengthPrecision' ? 'active' : ''}" onclick="app.changeSortType('lengthPrecision')">桁数×誤差順</button>`;
+        html += `<button class="sort-btn ${this.sortType === 'precisionThenShorter' ? 'active' : ''}" onclick="app.changeSortType('precisionThenShorter')">誤差→短さ順</button>`;
         html += '</div>';
         html += '</div>';
         html += '<div class="results-grid">';
 
         approximations.forEach((approx, index) => {
-            const { numerator, denominator, error, comprehensiveScore, lengthPrecisionScore } = approx;
+            const { numerator, denominator, error, comprehensiveScore, lengthPrecisionScore, precisionRank, totalLen } = approx;
             const decimalValue = (numerator / denominator).toFixed(6);
+            const latexString = `\\frac{${numerator}}{${denominator}}`;
 
-            html += '<div class="result-item">';
-            html += '<div class="fraction" id="fraction-' + index + '"></div>';
+            // data-latex属性にLaTeX文字列を埋め込む
+            html += `<div class="result-item" data-latex="${latexString.replace(/"/g, '&quot;')}" title="クリックでLaTeXコピー">`;
+            html += `<div class="fraction" id="fraction-${index}"></div>`;
             html += `<div class="decimal">≈ ${decimalValue}</div>`;
             html += `<div class="error">誤差: ${error.toExponential(3)}</div>`;
 
@@ -275,7 +298,10 @@ class RationalApproximator {
                 html += `<div class="score">総合評価: ${comprehensiveScore.toFixed(2)}</div>`;
             }
             if (this.sortType === 'lengthPrecision') {
-                html += `<div class="score">桁数×精度: ${lengthPrecisionScore.toFixed(2)}</div>`;
+                html += `<div class="score">桁数×誤差: ${lengthPrecisionScore.toFixed(2)}</div>`;
+            }
+            if (this.sortType === 'precisionThenShorter') {
+                html += `<div class="score">誤差: ${precisionRank}桁, 合計文字数: ${totalLen}</div>`;
             }
 
             html += '</div>';
@@ -292,6 +318,32 @@ class RationalApproximator {
             if (fractionElement) {
                 katex.render(latexString, fractionElement);
             }
+        });
+
+        // クリックでLaTeXコピー機能＋トースト表示
+        const toast = document.getElementById('copy-toast');
+        document.querySelectorAll('.result-item').forEach(item => {
+            item.addEventListener('click', (e) => {
+                const latex = item.getAttribute('data-latex');
+                if (latex) {
+                    navigator.clipboard.writeText(latex).then(() => {
+                        // トースト表示
+                        if (toast) {
+                            toast.style.display = 'block';
+                            setTimeout(() => {
+                                toast.style.display = 'none';
+                            }, 1000);
+                        }
+                        item.classList.add('copied');
+                        item.title = "コピーしました！";
+                        setTimeout(() => {
+                            item.classList.remove('copied');
+                            item.title = "クリックでLaTeXコピー";
+                        }, 1000);
+                    });
+                }
+                e.stopPropagation();
+            });
         });
     }
 
