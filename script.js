@@ -90,7 +90,7 @@ class RationalApproximator {
             }
         }
 
-        // 総合評価スコアを計算
+        // 分母×精度スコアを計算
         results.forEach(result => {
             result.comprehensiveScore = this.calculateComprehensiveScore(result.error, result.denominator);
             result.lengthPrecisionScore = this.calculateLengthPrecisionScore(result.numerator, result.denominator, result.error);
@@ -196,7 +196,7 @@ class RationalApproximator {
         // 分母スコアを調整
         let denominatorScore = 10 / (1 + Math.exp((denominator - 50) / 10));
         
-        // 掛け算による総合評価（どちらか一方が低いと全体が低くなる）
+        // 掛け算による分母×精度（どちらか一方が低いと全体が低くなる）
         const weightedScore = (errorScore * denominatorScore) / 10; // 10で割って0-10の範囲に正規化
         
         return weightedScore;
@@ -268,43 +268,73 @@ class RationalApproximator {
             return;
         }
 
-        let html = '<div class="results-header">';
+        let html = '<div id="copy-toast" style="display:none;position:fixed;top:30px;left:50%;transform:translateX(-50%);background:#27ae60;color:#fff;padding:12px 28px;border-radius:8px;font-size:16px;z-index:9999;box-shadow:0 2px 8px rgba(0,0,0,0.15);">コピーしました！</div>';
+
+        html += '<div class="results-header">';
         html += '<h3>近似分数候補</h3>';
         html += '<div class="sort-buttons">';
         html += `<button class="sort-btn ${this.sortType === 'error' ? 'active' : ''}" onclick="app.changeSortType('error')">誤差順</button>`;
         html += `<button class="sort-btn ${this.sortType === 'denominator' ? 'active' : ''}" onclick="app.changeSortType('denominator')">分母順</button>`;
-        html += `<button class="sort-btn ${this.sortType === 'comprehensive' ? 'active' : ''}" onclick="app.changeSortType('comprehensive')">総合評価順</button>`;
+        html += `<button class="sort-btn ${this.sortType === 'comprehensive' ? 'active' : ''}" onclick="app.changeSortType('comprehensive')">分母×精度順</button>`;
         html += `<button class="sort-btn ${this.sortType === 'lengthPrecision' ? 'active' : ''}" onclick="app.changeSortType('lengthPrecision')">桁数×精度順</button>`;
         html += `<button class="sort-btn ${this.sortType === 'precisionThenShorter' ? 'active' : ''}" onclick="app.changeSortType('precisionThenShorter')">ゴルフ順</button>`;
         html += '</div>';
         html += '</div>';
-        html += '<div class="results-grid">';
 
-        approximations.forEach((approx, index) => {
-            const { numerator, denominator, error, comprehensiveScore, lengthPrecisionScore, precisionRank, totalLen } = approx;
-            const decimalValue = (numerator / denominator).toFixed(6);
-            const latexString = `\\frac{${numerator}}{${denominator}}`;
+        if (this.sortType === 'error' || this.sortType === 'precisionThenShorter') {
+            // ゴルフ順: 精度ごとにグループ化して枠で表示
+            // グループ化
+            const groups = {};
+            approximations.forEach((approx, index) => {
+                const rank = approx.precisionRank;
+                if (!groups[rank]) groups[rank] = [];
+                groups[rank].push({ ...approx, index });
+            });
+            // 精度ランク降順で表示
+            const sortedRanks = Object.keys(groups)
+                .map(Number)
+                .sort((a, b) => b - a);
 
-            // data-latex属性にLaTeX文字列を埋め込む
-            html += `<div class="result-item" data-latex="${latexString.replace(/"/g, '&quot;')}" title="クリックでLaTeXコピー">`;
-            html += `<div class="fraction" id="fraction-${index}"></div>`;
-            html += `<div class="decimal">≈ ${decimalValue}</div>`;
-            html += `<div class="error">誤差: ${error.toExponential(3)}</div>`;
-
-            if (this.sortType === 'comprehensive') {
-                html += `<div class="score">総合評価: ${comprehensiveScore.toFixed(2)}</div>`;
-            }
-            if (this.sortType === 'lengthPrecision') {
-                html += `<div class="score">桁数×精度: ${lengthPrecisionScore.toFixed(2)}</div>`;
-            }
-            if (this.sortType === 'precisionThenShorter') {
-                html += `<div class="score">精度: ${precisionRank}桁, 合計文字数: ${totalLen}</div>`;
-            }
-
+            html += '<div class="golf-groups">';
+            sortedRanks.forEach(rank => {
+                html += `<div class="golf-group"><div class="golf-group-title">${rank}桁一致</div><div class="results-grid">`;
+                groups[rank].forEach(approx => {
+                    const { numerator, denominator, error, totalLen, index } = approx;
+                    const decimalValue = (numerator / denominator).toFixed(6);
+                    const latexString = `\\frac{${numerator}}{${denominator}}`;
+                    html += `<div class="result-item" data-latex="${latexString.replace(/"/g, '&quot;')}" title="クリックでLaTeXコピー">`;
+                    html += `<div class="fraction" id="fraction-${index}"></div>`;
+                    html += `<div class="decimal">≈ ${decimalValue}</div>`;
+                    html += `<div class="error">誤差: ${error.toExponential(3)}</div>`;
+                    html += `<div class="score">合計文字数: ${totalLen}</div>`;
+                    html += '</div>';
+                });
+                html += '</div></div>';
+            });
             html += '</div>';
-        });
-
-        html += '</div>';
+        } else {
+            html += '<div class="results-grid">';
+            approximations.forEach((approx, index) => {
+                const { numerator, denominator, error, comprehensiveScore, lengthPrecisionScore, precisionRank, totalLen } = approx;
+                const decimalValue = (numerator / denominator).toFixed(6);
+                const latexString = `\\frac{${numerator}}{${denominator}}`;
+                html += `<div class="result-item" data-latex="${latexString.replace(/"/g, '&quot;')}" title="クリックでLaTeXコピー">`;
+                html += `<div class="fraction" id="fraction-${index}"></div>`;
+                html += `<div class="decimal">≈ ${decimalValue}</div>`;
+                html += `<div class="error">誤差: ${error.toExponential(3)}</div>`;
+                if (this.sortType === 'comprehensive') {
+                    html += `<div class="score">分母×精度: ${comprehensiveScore.toFixed(2)}</div>`;
+                }
+                if (this.sortType === 'lengthPrecision') {
+                    html += `<div class="score">桁数×精度: ${lengthPrecisionScore.toFixed(2)}</div>`;
+                }
+                if (this.sortType === 'precisionThenShorter') {
+                    html += `<div class="score">精度: ${precisionRank}桁, 合計文字数: ${totalLen}</div>`;
+                }
+                html += '</div>';
+            });
+            html += '</div>';
+        }
         this.resultsDiv.innerHTML = html;
 
         // KaTeXで各分数を個別にレンダリング
@@ -317,13 +347,19 @@ class RationalApproximator {
             }
         });
 
-        // クリックでLaTeXコピー機能
+        // クリックでLaTeXコピー機能＋トースト表示
+        const toast = document.getElementById('copy-toast');
         document.querySelectorAll('.result-item').forEach(item => {
             item.addEventListener('click', (e) => {
                 const latex = item.getAttribute('data-latex');
                 if (latex) {
-                    // クリップボードにコピー
                     navigator.clipboard.writeText(latex).then(() => {
+                        if (toast) {
+                            toast.style.display = 'block';
+                            setTimeout(() => {
+                                toast.style.display = 'none';
+                            }, 1000);
+                        }
                         item.classList.add('copied');
                         item.title = "コピーしました！";
                         setTimeout(() => {
